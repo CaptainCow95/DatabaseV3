@@ -1,4 +1,5 @@
-﻿using System.Net.Sockets;
+﻿using System;
+using System.Net.Sockets;
 
 namespace DatabaseV3
 {
@@ -12,10 +13,13 @@ namespace DatabaseV3
         /// </summary>
         /// <param name="node">The node the connection is to.</param>
         /// <param name="client">The client that is the connection.</param>
-        public Connection(NetworkNode node, TcpClient client)
+        /// <param name="connectionTime">The time the connection was created.</param>
+        public Connection(NetworkNode node, TcpClient client, DateTime connectionTime)
         {
             Node = node;
             Client = client;
+            ConnectionTime = connectionTime;
+            Status = ConnectionStatus.Creating;
         }
 
         /// <summary>
@@ -27,11 +31,43 @@ namespace DatabaseV3
         }
 
         /// <summary>
+        /// Gets the time the connection was created.
+        /// </summary>
+        public DateTime ConnectionTime
+        {
+            get; private set;
+        }
+
+        /// <summary>
         /// Gets the node the connection is to.
         /// </summary>
         public NetworkNode Node
         {
             get; private set;
+        }
+
+        /// <summary>
+        /// Gets the status of the connection.
+        /// </summary>
+        public ConnectionStatus Status
+        {
+            get; private set;
+        }
+
+        /// <summary>
+        /// Mark the connection as connected.
+        /// </summary>
+        internal void Connected()
+        {
+            Status = ConnectionStatus.Connected;
+        }
+
+        /// <summary>
+        /// Mark the connection as disconnected.
+        /// </summary>
+        internal void Disconnected()
+        {
+            Status = ConnectionStatus.Disconnected;
         }
     }
 }
