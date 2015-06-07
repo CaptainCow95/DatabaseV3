@@ -1,5 +1,6 @@
 ﻿using DatabaseV3;
 using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 
 namespace UnitTests
@@ -18,7 +19,7 @@ namespace UnitTests
         {
             bool value = true;
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", value, null, null, null, null, null, value.ToString());
+            CheckDocument(document, "data", value, null, null, null, null, value.ToString());
         }
 
         /// <summary>
@@ -29,18 +30,7 @@ namespace UnitTests
         {
             string value = "true";
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", true, null, null, null, null, null, value);
-        }
-
-        /// <summary>
-        /// Tests using a byte array.
-        /// </summary>
-        [Test]
-        public void ByteArrayItem()
-        {
-            byte[] value = new byte[4] { 0, 1, 2, 3 };
-            Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, value, null, null, null, null, null);
+            CheckDocument(document, "data", true, null, null, null, null, value);
         }
 
         /// <summary>
@@ -49,16 +39,14 @@ namespace UnitTests
         /// <param name="doc">The document to test.</param>
         /// <param name="key">The key to test.</param>
         /// <param name="boolValue">The boolean value.</param>
-        /// <param name="byteArrayValue">The byte array value.</param>
         /// <param name="documentValue">The document value.</param>
         /// <param name="documentArrayValue">The document array value.</param>
         /// <param name="intValue">The 32-bit integer value.</param>
         /// <param name="longValue">The 64-bit integer value.</param>
         /// <param name="stringValue">The string value.</param>
-        public void CheckDocument(Document doc, string key, bool? boolValue, byte[] byteArrayValue, Document documentValue, DocumentArray documentArrayValue, int? intValue, long? longValue, string stringValue)
+        public void CheckDocument(Document doc, string key, bool? boolValue, Document documentValue, DocumentArray documentArrayValue, int? intValue, long? longValue, string stringValue)
         {
             Assert.AreEqual(boolValue, doc[key].AsBool);
-            Assert.AreEqual(byteArrayValue, doc[key].AsByteArray);
             Assert.AreEqual(documentValue, doc[key].AsDocument);
             Assert.AreEqual(documentArrayValue, doc[key].AsDocumentArray);
             Assert.AreEqual(intValue, doc[key].AsInt32);
@@ -74,7 +62,7 @@ namespace UnitTests
         {
             DocumentArray value = new DocumentArray(new List<object> { 5, "test", true });
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, null, null, value, null, null, null);
+            CheckDocument(document, "data", null, null, value, null, null, null);
         }
 
         /// <summary>
@@ -85,7 +73,7 @@ namespace UnitTests
         {
             Document value = new Document(new Dictionary<string, object> { { "Test", "Testing" } });
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, null, value, null, null, null, null);
+            CheckDocument(document, "data", null, value, null, null, null, null);
         }
 
         /// <summary>
@@ -96,7 +84,7 @@ namespace UnitTests
         {
             int value = int.MaxValue;
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, null, null, null, value, value, value.ToString());
+            CheckDocument(document, "data", null, null, null, value, value, value.ToString());
         }
 
         /// <summary>
@@ -107,7 +95,7 @@ namespace UnitTests
         {
             string value = "1234";
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, null, null, null, 1234, 1234, value);
+            CheckDocument(document, "data", null, null, null, 1234, 1234, value);
         }
 
         /// <summary>
@@ -118,7 +106,7 @@ namespace UnitTests
         {
             long value = long.MaxValue;
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, null, null, null, null, value, value.ToString());
+            CheckDocument(document, "data", null, null, null, null, value, value.ToString());
         }
 
         /// <summary>
@@ -129,7 +117,46 @@ namespace UnitTests
         {
             string value = "9876543210";
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, null, null, null, null, 9876543210, value);
+            CheckDocument(document, "data", null, null, null, null, 9876543210, value);
+        }
+
+        /// <summary>
+        /// Tests parsing JSON into a document.
+        /// </summary>
+        [Test]
+        public void Parse()
+        {
+            string json = "{\"string\":\"test\",\"int\":12345,\"long\":9876543210,\"bool\":true,\"document\":{\"key\":\"value\",\"key2\":false},\"array\":[1,2,true,\"key\"]}";
+            Document document = Document.Parse(json);
+            Assert.AreEqual("test", document["string"].AsString);
+            Assert.AreEqual(12345, document["int"].AsInt32);
+            Assert.AreEqual(9876543210, document["long"].AsInt64);
+            Assert.AreEqual(true, document["bool"].AsBool);
+            Assert.AreEqual(new Document(new Dictionary<string, object> { { "key", "value" }, { "key2", false } }), document["document"].AsDocument);
+            Assert.AreEqual(new DocumentArray(new List<object> { 1, 2, true, "key" }), document["array"].AsDocumentArray);
+            Assert.AreEqual(json, document.ToString());
+        }
+
+        /// <summary>
+        /// Tests parsing invalid JSON into a document.
+        /// </summary>
+        [Test]
+        public void ParseInvalid()
+        {
+            Assert.Throws<ArgumentException>(() =>
+            {
+                Document.Parse("{\"key\":\"value\"");
+            });
+
+            Assert.Throws<ArgumentException>(() =>
+            {
+                Document.Parse("{\"key:\"value\"}");
+            });
+
+            Assert.Throws<ArgumentException>(() =>
+            {
+                Document.Parse("{\"key\":\"value\"}}");
+            });
         }
 
         /// <summary>
@@ -140,7 +167,7 @@ namespace UnitTests
         {
             string value = "Test";
             Document document = new Document(new Dictionary<string, object> { { "data", value } });
-            CheckDocument(document, "data", null, null, null, null, null, null, value);
+            CheckDocument(document, "data", null, null, null, null, null, value);
         }
     }
 }

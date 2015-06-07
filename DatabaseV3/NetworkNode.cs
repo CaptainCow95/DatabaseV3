@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 
 namespace DatabaseV3
 {
@@ -15,6 +16,33 @@ namespace DatabaseV3
         public NetworkNode(string hostname, int port)
         {
             Hostname = hostname;
+            Port = port;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NetworkNode"/> class.
+        /// </summary>
+        /// <param name="connectionName">The connection in the format "hostname:port".</param>
+        public NetworkNode(string connectionName)
+        {
+            string[] parts = connectionName.Split(':');
+            if (parts.Length != 2)
+            {
+                throw new ArgumentException("Parameter is not in the format \"hostname:port\".", nameof(connectionName));
+            }
+
+            int port;
+            if (!int.TryParse(parts[1], out port))
+            {
+                throw new ArgumentException("Parameter is not in the format \"hostname:port\".", nameof(connectionName));
+            }
+
+            Hostname = parts[0];
+            if (Hostname.Equals("localhost", StringComparison.InvariantCultureIgnoreCase))
+            {
+                Hostname = Dns.GetHostName();
+            }
+
             Port = port;
         }
 

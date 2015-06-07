@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace DatabaseV3
@@ -6,12 +7,12 @@ namespace DatabaseV3
     /// <summary>
     /// Represents an array in a document.
     /// </summary>
-    public class DocumentArray : DocumentValue
+    public class DocumentArray : IDocumentElement
     {
         /// <summary>
         /// The data in the array.
         /// </summary>
-        private List<DocumentValue> _data = new List<DocumentValue>();
+        private List<IDocumentElement> _data = new List<IDocumentElement>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DocumentArray"/> class.
@@ -21,9 +22,9 @@ namespace DatabaseV3
         {
             foreach (var item in data)
             {
-                if (item is DocumentValue)
+                if (item is IDocumentElement)
                 {
-                    _data.Add((DocumentValue)item);
+                    _data.Add((IDocumentElement)item);
                 }
                 else
                 {
@@ -33,7 +34,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override bool? AsBool
+        public bool? AsBool
         {
             get
             {
@@ -42,7 +43,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override byte[] AsByteArray
+        public Document AsDocument
         {
             get
             {
@@ -51,16 +52,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override Document AsDocument
-        {
-            get
-            {
-                return null;
-            }
-        }
-
-        /// <inheritdoc />
-        public override DocumentArray AsDocumentArray
+        public DocumentArray AsDocumentArray
         {
             get
             {
@@ -69,7 +61,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override int? AsInt32
+        public int? AsInt32
         {
             get
             {
@@ -78,7 +70,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override long? AsInt64
+        public long? AsInt64
         {
             get
             {
@@ -87,7 +79,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override string AsString
+        public string AsString
         {
             get
             {
@@ -100,7 +92,7 @@ namespace DatabaseV3
         /// </summary>
         /// <param name="i">The index to get.</param>
         /// <returns>The value at the specified index.</returns>
-        public DocumentValue this[int i]
+        public IDocumentElement this[int i]
         {
             get
             {
@@ -111,8 +103,8 @@ namespace DatabaseV3
         /// <inheritdoc />
         public override bool Equals(object obj)
         {
-            DocumentArray value = obj as DocumentArray;
-            return value != null && Equals(_data, value._data);
+            DocumentArray array = obj as DocumentArray;
+            return array != null && _data.Count == array._data.Count && _data.Except(array._data).Any();
         }
 
         /// <inheritdoc />

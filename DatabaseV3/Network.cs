@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 
 namespace DatabaseV3
@@ -50,7 +51,7 @@ namespace DatabaseV3
         /// <summary>
         /// A value indicating whether the network is running.
         /// </summary>
-        private bool _running = false;
+        private bool _running = true;
 
         /// <summary>
         /// The wait handle to trigger when the network is no longer running.
@@ -66,6 +67,7 @@ namespace DatabaseV3
             _port = port;
             Logger.Log("Listening on port " + _port + ".", LogLevel.Info);
             _listener = new TcpListener(IPAddress.Any, _port);
+            _listener.Start();
             _listener.BeginAcceptTcpClient(AcceptTcpClient, null);
         }
 
@@ -91,8 +93,9 @@ namespace DatabaseV3
             lock (_connections)
             {
                 _nodesToConnectTo.Add(node);
-                ConnectToNode(node);
             }
+
+            ConnectToNode(node);
         }
 
         /// <summary>
@@ -125,6 +128,7 @@ namespace DatabaseV3
             _running = false;
             _runningWaitHandle.Set();
 
+            _listener.Stop();
             _reconnectionThread.Join();
             _messageListenerThread.Join();
         }
@@ -172,10 +176,14 @@ namespace DatabaseV3
             DateTime connectionTime;
             try
             {
-                node = new NetworkNode(((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString(), ((IPEndPoint)client.Client.RemoteEndPoint).Port);
-                byte[] buffer = new byte[sizeof(long)];
-                client.GetStream().Read(buffer, 0, sizeof(long));
-                connectionTime = DateTime.FromBinary(BitConverter.ToInt64(buffer, 0));
+                byte[] buffer = new byte[sizeof(int)];
+                client.GetStream().Read(buffer, 0, sizeof(int));
+                int length = BitConverter.ToInt32(buffer, 0);
+                buffer = new byte[length];
+                client.GetStream().Read(buffer, 0, length);
+                Document document = Document.Parse(Encoding.Unicode.GetString(buffer));
+                connectionTime = DateTime.FromBinary(document["ConnectionTime"].AsInt64.Value);
+                node = new NetworkNode(document["Address"].AsString);
                 Logger.Log("New connection request from " + node + ".", LogLevel.Debug);
             }
             catch
@@ -203,6 +211,7 @@ namespace DatabaseV3
                         else
                         {
                             client.GetStream().Write(BitConverter.GetBytes(false), 0, sizeof(bool));
+                            client.Close();
                             Logger.Log("Connection request failed, newer connection already established.", LogLevel.Debug);
                         }
                     }
@@ -232,10 +241,34 @@ namespace DatabaseV3
             {
                 DateTime connectionTime = DateTime.UtcNow;
                 TcpClient client = new TcpClient(node.Hostname, node.Port);
-                byte[] connectionTimeBytes = BitConverter.GetBytes(connectionTime.Ticks);
-                client.GetStream().Write(connectionTimeBytes, 0, connectionTimeBytes.Length);
-                _connections.Add(new Connection(node, new TcpClient(node.Hostname, node.Port), connectionTime));
-                Logger.Log("Connection request sent to " + node + ".", LogLevel.Debug);
+                Document document = new Document(new Dictionary<string, object>
+                {
+                    { "ConnectionTime", connectionTime.Ticks },
+                    { "Address", new NetworkNode(_port).ToString() }
+                });
+
+                string dataJson = document.ToString();
+                byte[] data = new byte[Encoding.Unicode.GetByteCount(dataJson) + sizeof(int)];
+                Encoding.Unicode.GetBytes(dataJson, 0, dataJson.Length, data, sizeof(int));
+                byte[] dataLengthBytes = BitConverter.GetBytes(Encoding.Unicode.GetByteCount(dataJson));
+                for (int i = 0; i < sizeof(int); ++i)
+                {
+                    data[i] = dataLengthBytes[i];
+                }
+
+                client.GetStream().Write(data, 0, data.Length);
+                lock (_connections)
+                {
+                    if (_connections.Where(e => e.Node.Equals(node)).Any())
+                    {
+                        client.Close();
+                    }
+                    else
+                    {
+                        _connections.Add(new Connection(node, client, connectionTime));
+                        Logger.Log("Connection request sent to " + node + ".", LogLevel.Debug);
+                    }
+                }
             }
             catch
             {
@@ -254,7 +287,11 @@ namespace DatabaseV3
                 {
                     foreach (var c in _connections)
                     {
-                        if (c.Client.Available > 0)
+                        if (c.Status == ConnectionStatus.Creating && DateTime.UtcNow > c.ConnectionTime + TimeSpan.FromMinutes(1))
+                        {
+                            c.Disconnected();
+                        }
+                        else if (c.Client.Available > 0)
                         {
                             if (c.Status == ConnectionStatus.Creating)
                             {
@@ -275,6 +312,13 @@ namespace DatabaseV3
                             }
                         }
                     }
+
+                    foreach (var c in _connections.Where(e => e.Status == ConnectionStatus.Disconnected))
+                    {
+                        Logger.Log("Connection to " + c.Node + " lost.", LogLevel.Debug);
+                    }
+
+                    _connections.RemoveAll(e => e.Status == ConnectionStatus.Disconnected);
                 }
             }
         }
@@ -287,13 +331,16 @@ namespace DatabaseV3
             _runningWaitHandle.WaitOne(5000);
             while (_running)
             {
+                List<NetworkNode> nodes;
                 lock (_connections)
                 {
-                    foreach (var n in _connections.Select(e => e.Node).Except(_nodesToConnectTo))
-                    {
-                        Logger.Log("Attempting to reconnect to " + n + ".", LogLevel.Debug);
-                        ConnectToNode(n);
-                    }
+                    nodes = _nodesToConnectTo.Except(_connections.Select(e => e.Node)).ToList();
+                }
+
+                foreach (var n in nodes)
+                {
+                    Logger.Log("Attempting to reconnect to " + n + ".", LogLevel.Debug);
+                    ConnectToNode(n);
                 }
 
                 _runningWaitHandle.WaitOne(5000);

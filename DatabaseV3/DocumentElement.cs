@@ -5,7 +5,7 @@ namespace DatabaseV3
     /// <summary>
     /// Represents an element in a document.
     /// </summary>
-    public class DocumentElement : DocumentValue
+    public class DocumentElement : IDocumentElement
     {
         /// <summary>
         /// The data in the document element.
@@ -22,7 +22,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override bool? AsBool
+        public bool? AsBool
         {
             get
             {
@@ -44,21 +44,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override byte[] AsByteArray
-        {
-            get
-            {
-                if (_data is byte[])
-                {
-                    return (byte[])_data;
-                }
-
-                return null;
-            }
-        }
-
-        /// <inheritdoc />
-        public override Document AsDocument
+        public Document AsDocument
         {
             get
             {
@@ -72,7 +58,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override DocumentArray AsDocumentArray
+        public DocumentArray AsDocumentArray
         {
             get
             {
@@ -86,7 +72,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override int? AsInt32
+        public int? AsInt32
         {
             get
             {
@@ -115,7 +101,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override long? AsInt64
+        public long? AsInt64
         {
             get
             {
@@ -141,7 +127,7 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
-        public override string AsString
+        public string AsString
         {
             get
             {
@@ -155,9 +141,32 @@ namespace DatabaseV3
         }
 
         /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return _data.Equals(obj);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return _data.GetHashCode();
+        }
+
+        /// <inheritdoc />
         public override string ToString()
         {
-            return _data.ToString();
+            if (_data is string)
+            {
+                return '\"' + _data.ToString() + '\"';
+            }
+            else if (_data is bool)
+            {
+                return _data.ToString().ToLowerInvariant();
+            }
+            else
+            {
+                return _data.ToString();
+            }
         }
     }
 }
